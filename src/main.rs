@@ -72,11 +72,16 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
     let special = match name.trim_start_matches("XKB_KEY_") {
         "Escape" => "Esc",
         "Return" | "KP_Enter" => "Return",
-        "Shift_L" | "Shift_R" => "Shift",
-        "Control_L" | "Control_R" => "Ctrl",
-        "Alt_L" | "Alt_R" => "Alt",
-        "Meta_L" | "Meta_R" => "Win",
-        "Super_L" | "Super_R" => "Win",
+        "Shift_L" => "Shift",
+        "Shift_R" => "ShiftR",
+        "Control_L" => "Ctrl",
+        "Control_R" => "CtrlR",
+        "Alt_L" => "Alt",
+        "Alt_R" => "AltR",
+        "Meta_L" => "Win",
+        "Meta_R" => "WinR",
+        "Super_L" => "Win",
+        "Super_R" => "WinR",
         "BackSpace" => "Backspace",
         "Tab" | "ISO_Left_Tab" => "Tab",
         "Caps_Lock" => "CapsLock",
@@ -653,8 +658,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
         for e in dir {
             if let Ok(e) = e {
                 if let Ok(name) = e.file_name().into_string() {
-                    if (name.ends_with("-event-kbd") && !name.contains("-if01-"))
-                        || name.ends_with("-event-mouse")
+                    if name.ends_with("-event-kbd") || name.ends_with("-event-mouse")
                     {
                         paths.push(e.path());
                     }
@@ -727,9 +731,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                             let rn = xkb::keysym_get_name(r);
                             eprintln!("DBG up code={} last_base={:?}", code, last_base.is_some());
                             let rm = match rn.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                                "shift_l" | "shift_r" => Some("Shift"),
-                                "control_l" | "control_r" => Some("Ctrl"),
-                                "alt_l" | "alt_r" => Some("Alt"),
+                                "shift_l" => Some("Shift"),
+                                "shift_r" => Some("ShiftR"),
+                                "control_l" => Some("Ctrl"),
+                                "control_r" => Some("CtrlR"),
+                                "alt_l" => Some("Alt"),
+                                "alt_r" => Some("AltR"),
                                 "iso_level3_shift" | "iso_level5_shift" => Some("AltGr"),
                                 "super_l" | "super_r" | "meta_l" | "meta_r" => Some(&win_label.to_string()[..]),
                                 _ => None,
@@ -781,9 +788,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     }
                     let nm = xkb::keysym_get_name(sym);
                     let mname = match nm.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                        "shift_l" | "shift_r" => Some("Shift".to_string()),
-                        "control_l" | "control_r" => Some("Ctrl".to_string()),
-                        "alt_l" | "alt_r" => Some("Alt".to_string()),
+                        "shift_l" => Some("Shift".to_string()),
+                        "shift_r" => Some("ShiftR".to_string()),
+                        "control_l" => Some("Ctrl".to_string()),
+                        "control_r" => Some("CtrlR".to_string()),
+                        "alt_l" => Some("Alt".to_string()),
+                        "alt_r" => Some("AltR".to_string()),
                         "iso_level3_shift" | "iso_level5_shift" => Some("AltGr".to_string()),
                         "super_l" | "super_r" | "meta_l" | "meta_r" => Some(win_label.to_string()),
                         _ => None,
