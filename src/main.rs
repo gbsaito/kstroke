@@ -185,19 +185,16 @@ impl App {
         ctx.set_font_size(FONT_SIZE);
         ctx.set_antialias(cairo::Antialias::Subpixel);
 
-        let mut x = KEY_PAD;
-        let y = h as f64 / 2.0;
-        for key in &self.keys {
+        // one key box at a time, right-aligned bottom
+        if let Some(key) = self.keys.last() {
             let mut text = key.text.clone();
             if key.count > 1 {
                 text.push_str(&format!(" ×{}", key.count));
             }
             let ext = ctx.text_extents(&text).unwrap();
             let bw = ext.width() + KEY_PAD * 2.0;
-            if x + bw > w as f64 - KEY_PAD {
-                break; // one row for now
-            }
-            // key box
+            let x = (w as f64) - KEY_PAD - bw;
+            let y = h as f64 / 2.0;
             ctx.set_source_rgba(BG.0 + 0.06, BG.1 + 0.06, BG.2 + 0.06, BG.3);
             ctx.rectangle(
                 x,
@@ -206,14 +203,12 @@ impl App {
                 ext.height() + KEY_PAD * 2.0,
             );
             ctx.fill().unwrap();
-            // text
             let col = if key.special { SPECIAL_FG } else { FG };
             ctx.set_source_rgba(col.0, col.1, col.2, col.3);
             let wb = ext.x_bearing();
             let hb = ext.y_bearing() + ext.height() / 2.0;
             ctx.move_to(x + KEY_PAD - wb, y - hb);
             ctx.show_text(&text).unwrap();
-            x += bw + KEY_GAP;
         }
 
         surface.flush();
@@ -573,6 +568,28 @@ impl Dispatch<wl_surface::WlSurface, ()> for App {
 }
 
 
+
+fn detect_xkb() -> (String, String, String) {
+    let mut rules = "evdev".to_string();
+    let mut layout = std::env::var("XKB_DEFAULT_LAYOUT").unwrap_or_else(|_| "br".into());
+    let mut variant = std::env::var("XKB_DEFAULT_VARIANT").unwrap_or_default();
+    if let Ok(toml) = std::fs::read_to_string("/home/saito/.config/mango/config.toml") {
+        for line in toml.lines() {
+            let t = line.trim();
+            if let Some(v) = t.strip_prefix("xkb_rules_layout") {
+                let v = v.trim().trim_start_matches('=').trim();
+                if !v.is_empty() { layout = v.to_string(); }
+            }
+            if let Some(v) = t.strip_prefix("xkb_rules_variant") {
+                let v = v.trim().trim_start_matches('=').trim();
+                if !v.is_empty() { variant = v.to_string(); }
+            }
+        }
+    }
+    if let Ok(l) = std::env::var("XKB_DEFAULT_LAYOUT") { if !l.is_empty() { layout = l; } }
+    (rules, layout, variant)
+}
+
 fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
     use evdev::{Device, EventSummary};
     let mut handles = Vec::new();
@@ -589,13 +606,11 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                     let tx = tx.clone();
                     let p = path.clone();
                     handles.push(std::thread::spawn(move || {
+                        let mut mods: Vec<String> = Vec::new();
                         let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-                        let rules = std::env::var("XKB_DEFAULT_RULES").unwrap_or_else(|_| "evdev".into());
-                        let model_s = std::env::var("XKB_DEFAULT_MODEL").unwrap_or_else(|_| "pc105".into());
-                        let layout = std::env::var("XKB_DEFAULT_LAYOUT").unwrap_or_else(|_| "br".into());
-                        let variant = std::env::var("XKB_DEFAULT_VARIANT").unwrap_or_default();
+                        let (rules, layout, variant) = detect_xkb();
                         let km = xkb::Keymap::new_from_names(
-                            &ctx, &rules, &model_s, &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
+                            &ctx, &rules, &"pc105".to_string(), &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
                             .expect("keymap");
                         let mut state = xkb::State::new(&km);
                         eprintln!("listening on {:?}", p);
@@ -627,9 +642,28 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                 {
                                     continue;
                                 }
-                                let (text, special) = label_for(sym);
+                                let (mut text, mut special) = label_for(sym);
                                 if text.is_empty() {
                                     continue;
+                                }
+                                let mname = {
+                                    let nm = xkb::keysym_get_name(sym);
+                                    match nm.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
+                                        "shift_l" | "shift_r" => Some("⇧".to_string()),
+                                        "control_l" | "control_r" => Some("Ctrl".to_string()),
+                                        "alt_l" | "alt_r" => Some("Alt".to_string()),
+                                        "meta_l" | "meta_r" | "super_l" | "super_r" => Some("⌘".to_string()),
+                                        _ => None,
+                                    }
+                                };
+                                if let Some(m) = mname {
+                                    if !mods.contains(&m) {
+                                        mods.push(m);
+                                    }
+                                    continue;
+                                }
+                                if !mods.is_empty() {
+                                    text = format!("{}+{}", mods.join("+"), text);
                                 }
                                 if tx.send((text, special)).is_err() {
                                     return;
