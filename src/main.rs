@@ -116,6 +116,11 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
 
 impl App {
     fn on_label(&mut self, text: String, special: bool) {
+        if text == "\u{7}" {
+            self.keys.clear();
+            self.dirty = true;
+            return;
+        }
         if text.is_empty() {
             return;
         }
@@ -644,10 +649,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                                 had
                                             }
                                         };
-                                        // combo over: re-render last key without mods
+                                        // combo over: re-render last key, or clear standalone-mod display
                                         if changed {
                                             if let Some((t, sp)) = &last_base {
                                                 let _ = tx.send((t.clone(), *sp));
+                                            } else {
+                                                let _ = tx.send(("\u{7}".to_string(), false));
                                             }
                                         }
                                     }
@@ -680,9 +687,10 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                     }
                                 };
                                 if let Some(m) = mname {
-                                    if m == "⇧" || m == "Ctrl" || m == "Alt" {
-                                        if !mods.contains(&m) { mods.push(m); }
-                                    }
+                                    if !mods.contains(&m) { mods.push(m); }
+                                    // standalone/holding display: show current mod stack
+                                    last_base = None;
+                                    let _ = tx.send((mods.join("+"), true));
                                     continue;
                                 }
                                 last_base = Some((text.clone(), special));
