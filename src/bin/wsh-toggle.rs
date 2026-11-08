@@ -1,6 +1,6 @@
 // wsh-toggle — global hotkey bridging:
-//   Insert           → toggle wshowkeys-rs (Rust overlay)
-//   Super+Insert     → toggle wshowkeys   (original C fork)
+//   Insert → toggle wshowkeys-rs only. Win+Insert intentionally unbound
+//   (reserved for notification history elsewhere).
 // Non-invasive: reads evdev (input group), spawns/kills the two binaries.
 
 use std::process::Command;
@@ -66,15 +66,8 @@ fn main() {
                     if val != 1 {
                         continue;
                     }
-                    match code {
-                        INSERT | INSERT2 => {
-                            if SUPER.load(Ordering::Relaxed) {
-                                toggle("wshowkeys", &["-a", "bottom", "-a", "right"]);
-                            } else {
-                                toggle("wshowkeys-rs", &[]);
-                            }
-                        }
-                        _ => {}
+                    if (code == INSERT || code == INSERT2) && !SUPER.load(Ordering::Relaxed) {
+                        toggle("wshowkeys-rs", &[]);
                     }
                 }
             }
