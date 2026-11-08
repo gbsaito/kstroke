@@ -12,6 +12,7 @@ URL="https://github.com/gbsaito/kstroke/releases/latest/download/kstroke-$A.tar.
 curl -fsSL "$URL" -o "$TMP/kstroke.tar.gz"
 tar -xzf "$TMP/kstroke.tar.gz" -C "$TMP"
 
+mkdir -p "$PREFIX/bin"
 install -m 0755 "$TMP/kstroke/kstroke" "$PREFIX/bin/kstroke"
 install -m 0755 "$TMP/kstroke/kstroke-toggle" "$PREFIX/bin/kstroke-toggle"
 
