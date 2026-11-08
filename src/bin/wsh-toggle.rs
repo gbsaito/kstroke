@@ -10,6 +10,10 @@ fn toggle(name: &str, args: &[&str]) {
     if running {
         let _ = Command::new("pkill").arg("-9").arg(name).status();
         eprintln!("toggle: killed {name}");
+        // never leave the old C overlay on while rust one is about to be off
+        if name == "wshowkeys-rs" {
+            let _ = Command::new("pkill").arg("-9").arg("wshowkeys").status();
+        }
     } else {
         let prog = if name.contains("wshowkeys-rs") {
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/release/wshowkeys-rs")
@@ -68,6 +72,8 @@ fn main() {
                     }
                     if (code == INSERT || code == INSERT2) && !SUPER.load(Ordering::Relaxed) {
                         toggle("wshowkeys-rs", &[]);
+                        // only one overlay may be visible
+                        let _ = Command::new("pkill").arg("-9").arg("wshowkeys").status();
                     }
                 }
             }
