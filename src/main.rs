@@ -724,11 +724,14 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                             };
                             let is_mod = rm.is_some();
                             if is_mod {
+                                let stack = mods.join("+");
                                 mods.retain(|x| x != &rm.unwrap().to_string());
                                 if let Some((t, sp)) = &last_base {
                                     let _ = tx.send((t.clone(), *sp, 0u32));
                                 } else if !mods.is_empty() {
                                     let _ = tx.send((mods.join("+"), true, 0u32));
+                                } else {
+                                    let _ = tx.send((stack, true, 0u32));
                                 }
                                 // standalone tap: box stays until expiry (0 post-refresh)
                             } else if let Some((t, sp)) = &last_base {
