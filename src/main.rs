@@ -1,14 +1,12 @@
 // wshowkeys-rs — Wayland key overlay, bottom-right by default, with padding.
 // Renders with cairo toy text API (no pango). Raw wayland-client.
 
-use std::io::{Read as _, Write as _};
 use std::os::fd::AsRawFd;
 use std::time::{Duration, Instant};
 
 use cairo::{Context, FontSlant, FontWeight, ImageSurface};
 use wayland_client::protocol::{
-    wl_buffer, wl_compositor, wl_keyboard, wl_output, wl_registry, wl_seat, wl_shm, wl_shm_pool,
-    wl_surface,
+    wl_buffer, wl_compositor, wl_output, wl_registry, wl_seat, wl_shm, wl_shm_pool, wl_surface,
 };
 use wayland_client::{Connection, Dispatch, QueueHandle, WEnum};
 use wayland_protocols_wlr::layer_shell::v1::client::{
@@ -39,13 +37,12 @@ struct Key {
 struct App {
     // globals
     compositor: Option<wl_compositor::WlCompositor>,
+    seat: Option<wl_seat::WlSeat>,
     shm: Option<wl_shm::WlShm>,
     shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
-    seat: Option<wl_seat::WlSeat>,
     // surfaces
     surface: Option<wl_surface::WlSurface>,
     layer: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
-    keyboard: Option<wl_keyboard::WlKeyboard>,
     // buffer
     buffer: Option<wl_buffer::WlBuffer>,
     memfd: Option<std::os::fd::RawFd>,
@@ -57,12 +54,9 @@ struct App {
     buf_busy: bool,
     // state
     keys: Vec<Key>,
-    xkb: Option<xkb::State>,
     running: bool,
     dirty: bool,
 }
-
-struct Shared<'a>(&'a mut App);
 
 fn label_for(sym: xkb::Keysym) -> (String, bool) {
     // (text, special) — boilerplate marker
@@ -151,7 +145,6 @@ impl App {
     }
 
     fn draw(&mut self, qh: &QueueHandle<Self>) {
-        use std::os::fd::BorrowedFd as _;
         let (w, h) = (self.width.max(1), self.height.max(1));
         if self.buffer.is_none() || self.memfd.is_none() {
             self.make_buffer(w, h, qh);
@@ -302,12 +295,11 @@ fn main() {
 
     let mut app = App {
         compositor: None,
+        seat: None,
         shm: None,
         shell: None,
-        seat: None,
         surface: None,
         layer: None,
-        keyboard: None,
         buffer: None,
         memfd: None,
         buf_data: None,
@@ -316,7 +308,6 @@ fn main() {
         need_ack: None,
         buf_busy: false,
         keys: Vec::new(),
-        xkb: None,
         running: true,
         dirty: false,
     };
@@ -355,7 +346,6 @@ fn main() {
 
     // event loop with poll-timeout so expiry works
     let fd = conn.backend().poll_fd().as_raw_fd();
-    let _ = fd;
     while app.running {
         let mut fds = [libc::pollfd {
             fd,
@@ -484,7 +474,7 @@ impl Dispatch<wl_output::WlOutput, ()> for App {
 
 impl Dispatch<wl_seat::WlSeat, ()> for App {
     fn event(
-        app: &mut Self,
+        _: &mut Self,
         seat: &wl_seat::WlSeat,
         event: wl_seat::Event,
         _: &(),
@@ -610,6 +600,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                             &ctx, &rules, &"pc105".to_string(), &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
                             .expect("keymap");
                         let mut state = xkb::State::new(&km);
+                        let mut last_base: Option<(String, bool)> = None;
                         eprintln!("listening on {:?}", p);
                         loop {
                             for ev in match dev.fetch_events() {
@@ -632,8 +623,24 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                             "alt_l" | "alt_r" => Some("Alt"),
                                             _ => None,
                                         };
-                                        if let Some(rm) = rm { mods.retain(|x| x != &rm.to_string()); }
-                                        else { mods.clear(); }
+                                        let changed = match rm {
+                                            Some(m) => {
+                                                let n = mods.len();
+                                                mods.retain(|x| x != &m.to_string());
+                                                !mods.is_empty() || n != mods.len()
+                                            }
+                                            None => {
+                                                let had = !mods.is_empty();
+                                                mods.clear();
+                                                had
+                                            }
+                                        };
+                                        // combo over: re-render last key without mods
+                                        if changed {
+                                            if let Some((t, sp)) = &last_base {
+                                                let _ = tx.send((t.clone(), *sp));
+                                            }
+                                        }
                                     }
                                     continue;
                                 }
@@ -669,6 +676,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                     }
                                     continue;
                                 }
+                                last_base = Some((text.clone(), special));
                                 if !mods.is_empty() {
                                     text = format!("{}+{}", mods.join("+"), text);
                                 }
