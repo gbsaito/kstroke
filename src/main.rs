@@ -577,23 +577,6 @@ impl Dispatch<wl_surface::WlSurface, ()> for App {
 
 fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
     use evdev::{Device, EventSummary};
-    let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-    let km = xkb::Keymap::new_from_names(
-        &ctx,
-        "evdev",
-        "pc105",
-        "us",
-        "",
-        None,
-        xkb::KEYMAP_COMPILE_NO_FLAGS,
-    )
-    .unwrap_or_else(|| {
-        eprintln!("xkb keymap failed");
-        std::process::exit(1);
-    });
-    let mut state = xkb::State::new(&km);
-    eprintln!("input_loop started");
-
     let mut handles = Vec::new();
     if let Ok(dir) = std::fs::read_dir("/dev/input") {
         for e in dir {
@@ -609,8 +592,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                     let p = path.clone();
                     handles.push(std::thread::spawn(move || {
                         let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+                        let rules = std::env::var("XKB_DEFAULT_RULES").unwrap_or_else(|_| "evdev".into());
+                        let model_s = std::env::var("XKB_DEFAULT_MODEL").unwrap_or_else(|_| "pc105".into());
+                        let layout = std::env::var("XKB_DEFAULT_LAYOUT").unwrap_or_else(|_| "br".into());
+                        let variant = std::env::var("XKB_DEFAULT_VARIANT").unwrap_or_default();
                         let km = xkb::Keymap::new_from_names(
-                            &ctx, "evdev", "pc105", "us", "", None, xkb::KEYMAP_COMPILE_NO_FLAGS)
+                            &ctx, &rules, &model_s, &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
                             .expect("keymap");
                         let mut state = xkb::State::new(&km);
                         eprintln!("listening on {:?}", p);
