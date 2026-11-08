@@ -687,6 +687,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                 "shift_l" | "shift_r" => Some("Shift"),
                                 "control_l" | "control_r" => Some("Ctrl"),
                                 "alt_l" | "alt_r" => Some("Alt"),
+                                "iso_level3_shift" | "iso_level5_shift" => Some("AltGr"),
                                 "super_l" | "super_r" | "meta_l" | "meta_r" => Some(&win_label.to_string()[..]),
                                 _ => None,
                             };
@@ -735,6 +736,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         "shift_l" | "shift_r" => Some("Shift".to_string()),
                         "control_l" | "control_r" => Some("Ctrl".to_string()),
                         "alt_l" | "alt_r" => Some("Alt".to_string()),
+                        "iso_level3_shift" | "iso_level5_shift" => Some("AltGr".to_string()),
                         "super_l" | "super_r" | "meta_l" | "meta_r" => Some(win_label.to_string()),
                         _ => None,
                     };
@@ -748,11 +750,18 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     }
                     last_base = Some((text.clone(), special));
                     eprintln!("DBG down code={} text={}", code, text);
-                    if !mods.is_empty() {
-                        text = format!("{}+{}", mods.join("+"), text);
-                    }
-                    if tx.send((text, special, 1u32)).is_err() {
-                        return;
+                    // shift alone produces the glyph itself: show "!" not "Shift+!"
+                    if mods.len() == 1 && mods.contains(&"Shift".to_string()) {
+                        if tx.send((text, special, 1u32)).is_err() {
+                            return;
+                        }
+                    } else {
+                        if !mods.is_empty() {
+                            text = format!("{}+{}", mods.join("+"), text);
+                        }
+                        if tx.send((text, special, 1u32)).is_err() {
+                            return;
+                        }
                     }
                 }
             }
