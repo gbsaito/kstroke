@@ -577,11 +577,11 @@ fn detect_xkb() -> (String, String, String) {
         for line in toml.lines() {
             let t = line.trim();
             if let Some(v) = t.strip_prefix("xkb_rules_layout") {
-                let v = v.trim().trim_start_matches('=').trim();
+                let v = v.trim().trim_start_matches('=').trim().trim_matches('"');
                 if !v.is_empty() { layout = v.to_string(); }
             }
             if let Some(v) = t.strip_prefix("xkb_rules_variant") {
-                let v = v.trim().trim_start_matches('=').trim();
+                let v = v.trim().trim_start_matches('=').trim().trim_matches('"');
                 if !v.is_empty() { variant = v.to_string(); }
             }
         }
