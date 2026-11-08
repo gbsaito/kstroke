@@ -85,8 +85,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "Insert" => "Ins",
         "Home" => "↖",
         "End" => "↘",
-        "Page_Up" => "⇞",
-        "Page_Down" => "⇟",
+        "Prior" | "Page_Up" => "PageUp",
+        "Next" | "Page_Down" => "PageDn",
         "Up" => "↑",
         "Down" => "↓",
         "Left" => "←",
@@ -677,8 +677,9 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     if !pressed {
                         if let Some(&r) = state.key_get_syms(kc).first() {
                             let rn = xkb::keysym_get_name(r);
+                            eprintln!("DBG up code={} last_base={:?}", code, last_base.is_some());
                             let rm = match rn.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                                "shift_l" | "shift_r" => Some("\u{21e7}"),
+                                "shift_l" | "shift_r" => Some("Shift"),
                                 "control_l" | "control_r" => Some("Ctrl"),
                                 "alt_l" | "alt_r" => Some("Alt"),
                                 _ => None,
@@ -690,6 +691,8 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                 let n2 = mods.len();
                                 if let Some((t, sp)) = &last_base {
                                     let _ = tx.send((t.clone(), *sp, 0u32));
+                                } else if !mods.is_empty() {
+                                    let _ = tx.send((mods.join("+"), true, 0u32));
                                 } else if n != n2 {
                                     let _ = tx.send(("\u{7}".to_string(), false, 0u32));
                                 }
@@ -701,6 +704,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         continue;
                     }
                     if repeating {
+                        eprintln!("DBG repeat code={}", code);
                         if let Some((t, sp)) = &last_base {
                             let _ = tx.send((t.clone(), *sp, 2u32));
                         }
@@ -725,7 +729,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     }
                     let nm = xkb::keysym_get_name(sym);
                     let mname = match nm.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                        "shift_l" | "shift_r" => Some("\u{21e7}".to_string()),
+                        "shift_l" | "shift_r" => Some("Shift".to_string()),
                         "control_l" | "control_r" => Some("Ctrl".to_string()),
                         "alt_l" | "alt_r" => Some("Alt".to_string()),
                         _ => None,
@@ -733,11 +737,13 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     if let Some(m) = mname {
                         if !mods.contains(&m) { mods.push(m); }
                         // standalone/holding display: show current mod stack
+                        eprintln!("DBG down stack={:?}", mods);
                         last_base = None;
                         let _ = tx.send((mods.join("+"), true, 1u32));
                         continue;
                     }
                     last_base = Some((text.clone(), special));
+                    eprintln!("DBG down code={} text={}", code, text);
                     if !mods.is_empty() {
                         text = format!("{}+{}", mods.join("+"), text);
                     }
