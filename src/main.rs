@@ -690,8 +690,6 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                 let n2 = mods.len();
                                 if let Some((t, sp)) = &last_base {
                                     let _ = tx.send((t.clone(), *sp, 0u32));
-                                } else if !mods.is_empty() {
-                                    let _ = tx.send((mods.join("+"), true, 0u32));
                                 } else if n != n2 {
                                     let _ = tx.send(("\u{7}".to_string(), false, 0u32));
                                 }
