@@ -146,6 +146,7 @@ fn rounded_rect(ctx: &cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
 
 impl App {
     fn on_label(&mut self, text: String, special: bool, val: u32) {
+        eprintln!("DBGLBL receive='{}' val={}", text, val);
         if text == "\u{7}" {
             self.keys.clear();
             self.dirty = true;
@@ -826,16 +827,6 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     let base_c = base_label_shift.chars().next().unwrap();
                     let suppress_shift = should_suppress
                         && !base_c.is_ascii_alphabetic();
-                    if suppress_shift {
-                        let base_sym = *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym);
-                        let base_label = label_for(base_sym).0;
-                        let base_c = base_label.chars().next().unwrap();
-                        let shift_is_digit = base_c.is_ascii_digit();
-                        let shift_is_punct = !base_c.is_ascii_alphanumeric();
-                        if shift_is_punct {
-                            text = base_label;
-                        }
-                    }
                     if suppress_shift {
                         if tx.send((text, special, 1u32)).is_err() {
                             return;
