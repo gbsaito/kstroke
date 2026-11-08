@@ -121,8 +121,7 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
 }
 
 impl App {
-    fn on_key_text(&mut self, sym: xkb::Keysym) {
-        let (text, special) = label_for(sym);
+    fn on_label(&mut self, text: String, special: bool) {
         if text.is_empty() {
             return;
         }
@@ -174,6 +173,11 @@ impl App {
         .unwrap();
         let ctx = Context::new(&surface).unwrap();
 
+        // clear before painting (buffer is reused between frames)
+        ctx.set_operator(cairo::Operator::Clear);
+        ctx.paint().unwrap();
+        ctx.set_operator(cairo::Operator::Over);
+
         // background
         ctx.set_source_rgba(BG.0, BG.1, BG.2, BG.3);
         ctx.paint().unwrap();
@@ -215,6 +219,17 @@ impl App {
         }
 
         surface.flush();
+        if std::env::var_os("WSK_DUMP").is_some() {
+            let data = self.buf_data.as_ref().unwrap();
+            let ink = (0..h as usize).map(|y| (0..w as usize).filter(|x| data[y*stride + x*4+3] > 30).count()).sum::<usize>();
+            let solid = (0..h as usize).map(|y| (0..w as usize).filter(|x| data[y*stride + x*4+3] >= 250).count()).sum::<usize>();
+                        if let Some(k) = self.keys.last() {
+                let ext = ctx.text_extents(&k.text).unwrap();
+                eprintln!("draw: {}x{} ink={} solid={} last_key={:?} ext={}x{} @{}", w, h, ink, solid, k.text, ext.width(), ext.height(), ext.x_bearing());
+            } else {
+                eprintln!("draw: {}x{} ink={} solid={} (no keys)", w, h, ink, solid);
+            }
+        }
 
         if self.buf_busy {
             return; // previous buffer not released yet
@@ -225,6 +240,10 @@ impl App {
         surf.damage(0, 0, w, h);
         surf.commit();
         self.buf_busy = true;
+        if let Ok(f) = std::env::var("WSK_NORELEASE") {
+            let _ = f;
+            self.buf_busy = false; // compositor doesn't send Release
+        }
 
         // schedule next frame so expiry redraws even without key events
         // wl_frame event via Dispatch<WlCallback>? Not wired; skip if unknown
@@ -337,8 +356,13 @@ fn main() {
 
     queue.roundtrip(&mut app).unwrap(); // pick up initial configure
 
+    // input thread: evdev direct read (like C fork libinput path)
+    let (tx, rx) = std::sync::mpsc::channel::<(String, bool)>();
+    std::thread::spawn(move || input_loop(tx));
+
     // event loop with poll-timeout so expiry works
     let fd = conn.backend().poll_fd().as_raw_fd();
+    let _ = fd;
     while app.running {
         let mut fds = [libc::pollfd {
             fd,
@@ -352,6 +376,9 @@ fn main() {
                 queue.dispatch_pending(&mut app).unwrap();
             }
         }
+        while let Ok((text, special)) = rx.try_recv() {
+            app.on_label(text, special);
+        }
         app.prune();
         if let Some(serial) = app.need_ack.take() {
             app.layer.as_ref().unwrap().ack_configure(serial);
@@ -362,8 +389,7 @@ fn main() {
             app.draw(&qh);
             if app.buf_busy {
                 app.dirty = true; // retry after release
-            }
-        }
+            }        }
         conn.flush().unwrap();
     }
 }
@@ -479,92 +505,16 @@ impl Dispatch<wl_seat::WlSeat, ()> for App {
             capabilities: WEnum::Value(caps),
         } = event
         {
+            if std::env::var_os("WSK_DUMP").is_some() {
+                eprintln!("seat caps: {:?}", caps);
+            }
             if (caps & wl_seat::Capability::Keyboard) != wl_seat::Capability::empty() {
-                app.keyboard = Some(seat.get_keyboard(qh, ()));
+                // NOP: keys come from evdev directly (like the C fork), not wl_keyboard.
             }
         }
     }
 }
 
-impl Dispatch<wl_keyboard::WlKeyboard, ()> for App {
-    fn event(
-        app: &mut Self,
-        _: &wl_keyboard::WlKeyboard,
-        event: wl_keyboard::Event,
-        _: &(),
-        _: &Connection,
-        _: &QueueHandle<Self>,
-    ) {
-        match event {
-            wl_keyboard::Event::Keymap {
-                format: _,
-                fd,
-                size,
-                ..
-            } => {
-                // fd is owned by compositor until we're done reading; don't close ourselves
-                let mut buf = String::new();
-                {
-                    let mut f = std::fs::File::from(fd);
-                    let _ = f.take(size as u64).read_to_string(&mut buf);
-                } // we own this fd; close after reading
-                let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-                if let Some(km) = xkb::Keymap::new_from_string(
-                    &ctx,
-                    buf,
-                    xkb::KEYMAP_FORMAT_TEXT_V1,
-                    xkb::KEYMAP_COMPILE_NO_FLAGS,
-                ) {
-                    app.xkb = Some(xkb::State::new(&km));
-                }
-            }
-            wl_keyboard::Event::Modifiers {
-                mods_depressed,
-                mods_latched,
-                mods_locked,
-                group,
-                ..
-            } => {
-                if let Some(st) = app.xkb.as_mut() {
-                    st.update_mask(mods_depressed, mods_latched, mods_locked, 0, 0, group);
-                }
-            }
-            wl_keyboard::Event::Key {
-                key,
-                state: WEnum::Value(wl_keyboard::KeyState::Pressed),
-                ..
-            } => {
-                if let Some(st) = &app.xkb {
-                    let kc = xkb::Keycode::new((key + 8) as u32);
-                    if let Some(&sym) = st.key_get_syms(kc).first() {
-                        // allow letters/digits/space + punctuation; block pause-type keys for safety
-                        let safe = !matches!(
-                            xkb::keysym_get_name(sym).as_str(),
-                            "Pause" | "XF86KB_..." | "PowerOff"
-                        );
-                        let _ = safe;
-                        let name = xkb::keysym_get_name(sym);
-                        if [
-                            "Pause",
-                            "XF86PowerOff",
-                            "XF86Sleep",
-                            "XF86PowerKey",
-                            "KP_Enter",
-                            "Return",
-                        ]
-                        .contains(&name.as_str())
-                        {
-                            // Never render/inject-measure these; also skip Return typographic emulation
-                            return;
-                        }
-                        app.on_key_text(sym);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-}
 
 impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for App {
     fn event(
@@ -621,5 +571,92 @@ impl Dispatch<wl_surface::WlSurface, ()> for App {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+    }
+}
+
+
+fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
+    use evdev::{Device, EventSummary};
+    let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+    let km = xkb::Keymap::new_from_names(
+        &ctx,
+        "evdev",
+        "pc105",
+        "us",
+        "",
+        None,
+        xkb::KEYMAP_COMPILE_NO_FLAGS,
+    )
+    .unwrap_or_else(|| {
+        eprintln!("xkb keymap failed");
+        std::process::exit(1);
+    });
+    let mut state = xkb::State::new(&km);
+    eprintln!("input_loop started");
+
+    let mut handles = Vec::new();
+    if let Ok(dir) = std::fs::read_dir("/dev/input") {
+        for e in dir {
+            let path = e.ok().map(|e| e.path());
+            let Some(path) = path else { continue };
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !name.starts_with("event") {
+                continue;
+            }
+            if let Ok(mut dev) = Device::open(&path) {
+                if dev.supported_keys().map(|k| k.iter().nth(0).is_some()).unwrap_or(false) {
+                    let tx = tx.clone();
+                    let p = path.clone();
+                    handles.push(std::thread::spawn(move || {
+                        let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+                        let km = xkb::Keymap::new_from_names(
+                            &ctx, "evdev", "pc105", "us", "", None, xkb::KEYMAP_COMPILE_NO_FLAGS)
+                            .expect("keymap");
+                        let mut state = xkb::State::new(&km);
+                        eprintln!("listening on {:?}", p);
+                        loop {
+                            for ev in match dev.fetch_events() {
+                                Ok(it) => it,
+                                Err(_) => break,
+                            } {
+                                let (code, val) = match ev.destructure() {
+                                    EventSummary::Key(_, k, v) => (u32::from(k.code()), v),
+                                    _ => continue,
+                                };
+                                let pressed = val == 1;
+                                let kc = xkb::Keycode::new(code + 8);
+                                state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
+                                if !pressed {
+                                    continue;
+                                }
+                                let Some(&sym) = state.key_get_syms(kc).first() else {
+                                    continue;
+                                };
+                                let name = xkb::keysym_get_name(sym);
+                                // SAFETY: never process power/sleep/pause-class keys
+                                if [
+                                    "Pause", "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
+                                    "XF86Standby", "XF86Hibernate", "XF86_Suspend",
+                                ]
+                                .contains(&name.as_str())
+                                {
+                                    continue;
+                                }
+                                let (text, special) = label_for(sym);
+                                if text.is_empty() {
+                                    continue;
+                                }
+                                if tx.send((text, special)).is_err() {
+                                    return;
+                                }
+                            }
+                        }
+                    }));
+                }
+            }
+        }
+    }
+    for h in handles {
+        let _ = h.join();
     }
 }

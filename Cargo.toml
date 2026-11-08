@@ -14,3 +14,4 @@ wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 xkbcommon = "0.9"
 cairo-rs = "0.22"
 libc = "0.2"
+evdev = "0.13.2"
