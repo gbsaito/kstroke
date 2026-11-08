@@ -89,6 +89,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "Insert" => "Ins",
         "Home" => "Home",
         "End" => "End",
+        "Prior" | "Page_Up" => "PageUp",
+        "Next" | "Page_Down" => "PageDn",
         "Period" | "Full_Stop" | "period" => ".",
         "Comma" | "comma" => ",",
         "XF86MonBrightnessUp" => "Brightness+",
