@@ -62,7 +62,7 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
     // (text, special) — boilerplate marker
     let utf8 = xkb::keysym_to_utf8(sym);
     let c = utf8.chars().next().unwrap_or('\0');
-    if utf8.len() == 1 && !c.is_control() && !c.is_whitespace() && c != '\0' {
+    if utf8.chars().count() == 1 && !c.is_control() && !c.is_whitespace() && c != '\0' {
         return (utf8, false);
     }
     if c == ' ' {
@@ -71,15 +71,15 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
     let name = xkb::keysym_get_name(sym);
     let special = match name.trim_start_matches("XKB_KEY_") {
         "Escape" => "Esc",
-        "Return" | "KP_Enter" => "↵",
+        "Return" | "KP_Enter" => "Return",
         "Shift_L" | "Shift_R" => "Shift",
         "Control_L" | "Control_R" => "Ctrl",
         "Alt_L" | "Alt_R" => "Alt",
         "Meta_L" | "Meta_R" => "Meta",
         "Super_L" | "Super_R" => "⌘",
-        "BackSpace" => "⌫",
-        "Tab" | "ISO_Left_Tab" => "⇥",
-        "Caps_Lock" => "⌷",
+        "BackSpace" => "Backspace",
+        "Tab" | "ISO_Left_Tab" => "Tab",
+        "Caps_Lock" => "CapsLock",
         "Delete" => "Del",
         "Insert" => "Ins",
         "Home" => "↖",
