@@ -23,7 +23,7 @@ const KEY_GAP: f64 = 12.0;
 const EXPIRY: Duration = Duration::new(2, 500000000);
 const FONT_FAMILY: &str = "JetBrains Mono";
 const FONT_SIZE: f64 = 34.0;
-const BG: (f64, f64, f64, f64) = (0.08, 0.08, 0.08, 0.92);
+const BG: (f64, f64, f64, f64) = (0.08, 0.08, 0.08, 0.55);
 const FG: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0);
 const SPECIAL_FG: (f64, f64, f64, f64) = (0.85, 0.45, 0.35, 1.0);
 
@@ -31,6 +31,7 @@ struct Key {
     text: String,
     special: bool,
     count: u32,
+    hold: bool,
     t: Instant,
 }
 
@@ -115,7 +116,7 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
 }
 
 impl App {
-    fn on_label(&mut self, text: String, special: bool) {
+    fn on_label(&mut self, text: String, special: bool, val: u32) {
         if text == "\u{7}" {
             self.keys.clear();
             self.dirty = true;
@@ -124,14 +125,27 @@ impl App {
         if text.is_empty() {
             return;
         }
+        // val: 0 = display refresh (released), 1 = press, 2 = key repeat (held)
+        if val == 0 {
+            if let Some(i) = self.keys.iter().position(|k| k.text == text) {
+                let mut k = self.keys.remove(i);
+                k.hold = false;
+                k.t = Instant::now();
+                self.keys.push(k);
+                self.dirty = true;
+            }
+            return;
+        }
         let prev = self.keys.last().map(|l| (l.text.clone(), l.count));
+        let hold = val == 2;
         if let Some(i) = self.keys.iter().position(|k| k.text == text) {
             let mut k = self.keys.remove(i);
-            // repeat only counts consecutive presses of the same key
+            // repeat counts only when consecutive (same key pressed/held repeatedly)
             k.count = match prev {
                 Some((t, c)) if t == text => c + 1,
                 _ => 1,
             };
+            k.hold = hold;
             k.t = Instant::now();
             self.keys.push(k); // most-recently-updated last: shown box follows focus
         } else {
@@ -139,6 +153,7 @@ impl App {
                 text,
                 special,
                 count: 1,
+                hold,
                 t: Instant::now(),
             });
             while self.keys.len() > 10 {
@@ -193,6 +208,9 @@ impl App {
         // one key box at a time, right-aligned bottom
         if let Some(key) = self.keys.last() {
             let mut text = key.text.clone();
+            if key.hold {
+                text = format!("{} (Hold)", text);
+            }
             if key.count > 1 {
                 text.push_str(&format!(" ×{}", key.count));
             }
@@ -355,7 +373,7 @@ fn main() {
     queue.roundtrip(&mut app).unwrap(); // pick up initial configure
 
     // input thread: evdev direct read (like C fork libinput path)
-    let (tx, rx) = std::sync::mpsc::channel::<(String, bool)>();
+    let (tx, rx) = std::sync::mpsc::channel::<(String, bool, u32)>();
     std::thread::spawn(move || input_loop(tx));
 
     // event loop with poll-timeout so expiry works
@@ -373,8 +391,8 @@ fn main() {
                 queue.dispatch_pending(&mut app).unwrap();
             }
         }
-        while let Ok((text, special)) = rx.try_recv() {
-            app.on_label(text, special);
+        while let Ok((text, special, val)) = rx.try_recv() {
+            app.on_label(text, special, val);
         }
         app.prune();
         if let Some(serial) = app.need_ack.take() {
@@ -591,7 +609,7 @@ fn detect_xkb() -> (String, String, String) {
     (rules, layout, variant)
 }
 
-fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
+fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
     use evdev::{Device, EventSummary};
     let mut handles = Vec::new();
     // one -event-kbd node per physical keyboard; event* enumeration double-counts
@@ -653,6 +671,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                         _ => continue,
                     };
                     let pressed = val == 1;
+                    let repeating = val == 2;
                     let kc = xkb::Keycode::new(code + 8);
                     state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
                     if !pressed {
@@ -664,24 +683,28 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                 "alt_l" | "alt_r" => Some("Alt"),
                                 _ => None,
                             };
-                            let show = match rm {
-                                Some(m) => {
-                                    let n = mods.len();
-                                    mods.retain(|x| x != &m.to_string());
-                                    last_base.is_some() || n != mods.len()
-                                }
-                                // base key released: keep held mods, just refresh display
-                                None => last_base.is_some(),
-                            };
-                            if show {
+                            let is_mod = rm.is_some();
+                            if is_mod {
+                                let n = mods.len();
+                                mods.retain(|x| x != &rm.unwrap().to_string());
+                                let n2 = mods.len();
                                 if let Some((t, sp)) = &last_base {
-                                    let _ = tx.send((t.clone(), *sp));
+                                    let _ = tx.send((t.clone(), *sp, 0u32));
                                 } else if !mods.is_empty() {
-                                    let _ = tx.send((mods.join("+"), true));
-                                } else {
-                                    let _ = tx.send(("\u{7}".to_string(), false));
+                                    let _ = tx.send((mods.join("+"), true, 0u32));
+                                } else if n != n2 {
+                                    let _ = tx.send(("\u{7}".to_string(), false, 0u32));
                                 }
+                            } else if let Some((t, sp)) = &last_base {
+                                // base key released: display persists (no extra count)
+                                let _ = tx.send((t.clone(), *sp, 0u32));
                             }
+                        }
+                        continue;
+                    }
+                    if repeating {
+                        if let Some((t, sp)) = &last_base {
+                            let _ = tx.send((t.clone(), *sp, 2u32));
                         }
                         continue;
                     }
@@ -698,7 +721,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                     {
                         continue;
                     }
-                    let (text, special) = label_for(sym);
+                    let (mut text, special) = label_for(sym);
                     if text.is_empty() {
                         continue;
                     }
@@ -713,14 +736,14 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                         if !mods.contains(&m) { mods.push(m); }
                         // standalone/holding display: show current mod stack
                         last_base = None;
-                        let _ = tx.send((mods.join("+"), true));
+                        let _ = tx.send((mods.join("+"), true, 1u32));
                         continue;
                     }
                     last_base = Some((text.clone(), special));
                     if !mods.is_empty() {
                         text = format!("{}+{}", mods.join("+"), text);
                     }
-                    if tx.send((text, special)).is_err() {
+                    if tx.send((text, special, 1u32)).is_err() {
                         return;
                     }
                 }
