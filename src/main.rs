@@ -138,6 +138,17 @@ impl App {
         }
         let prev = self.keys.last().map(|l| (l.text.clone(), l.count));
         let hold = val == 2;
+        if hold {
+            // held: show marker, keep count frozen
+            if let Some(i) = self.keys.iter().position(|k| k.text == text) {
+                let mut k = self.keys.remove(i);
+                k.hold = true;
+                k.t = Instant::now();
+                self.keys.push(k);
+                self.dirty = true;
+            }
+            return;
+        }
         if let Some(i) = self.keys.iter().position(|k| k.text == text) {
             let mut k = self.keys.remove(i);
             // repeat counts only when consecutive (same key pressed/held repeatedly)
