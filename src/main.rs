@@ -727,7 +727,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     let pressed = val == 1;
                     let repeating = val == 2;
                     let kc = xkb::Keycode::new(code + 8);
-                    state.update_key(kc, if val == 0 { xkb::KeyDirection::Up } else { xkb::KeyDirection::Down });
+                    // feed xkb state ONLY real press/release; autorepeat (val==2) must not
+                    // re-send Down: libxkbcommon counts downs internally, so repeats leave
+                    // the mod latched after release (all keys read as Shifted)
+                    if val != 2 {
+                        state.update_key(kc, if val == 0 { xkb::KeyDirection::Up } else { xkb::KeyDirection::Down });
+                    }
                     if !pressed && val == 0 {
                         if let Some(&r) = state.key_get_syms(kc).first() {
                             let rn = xkb::keysym_get_name(r);
