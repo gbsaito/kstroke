@@ -778,13 +778,6 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         continue;
                     };
                     let name = xkb::keysym_get_name(sym);
-                    if [".", ","].contains(&name.as_str()) {
-                        use std::io::Write;
-                        let log = format!("{}:{}\n", code, name);
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open("/tmp/keylog.txt") {
-                            let _ = f.write_all(log.as_bytes());
-                        }
-                    }
                     // SAFETY: never process power/sleep/pause-class keys
                     if [
                         "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
