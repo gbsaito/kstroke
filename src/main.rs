@@ -195,14 +195,6 @@ impl App {
             let bw = ext.width() + KEY_PAD * 2.0;
             let x = (w as f64) - KEY_PAD - bw;
             let y = h as f64 / 2.0;
-            ctx.set_source_rgba(0.06, 0.06, 0.06, 0.72);
-            ctx.rectangle(
-                x - 3.0,
-                y - (ext.height() / 2.0 + KEY_PAD + 3.0),
-                bw + 6.0,
-                ext.height() + KEY_PAD * 2.0 + 6.0,
-            );
-            ctx.fill().unwrap();
             ctx.set_source_rgba(BG.0 + 0.06, BG.1 + 0.06, BG.2 + 0.06, BG.3);
             ctx.rectangle(
                 x,
@@ -660,13 +652,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                         "shift_l" | "shift_r" => Some("⇧".to_string()),
                                         "control_l" | "control_r" => Some("Ctrl".to_string()),
                                         "alt_l" | "alt_r" => Some("Alt".to_string()),
-                                        "meta_l" | "meta_r" | "super_l" | "super_r" => Some("⌘".to_string()),
                                         _ => None,
                                     }
                                 };
                                 if let Some(m) = mname {
-                                    if !mods.contains(&m) {
-                                        mods.push(m);
+                                    if m == "⇧" || m == "Ctrl" || m == "Alt" {
+                                        if !mods.contains(&m) { mods.push(m); }
                                     }
                                     continue;
                                 }
