@@ -91,6 +91,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "End" => "End",
         "KP_Prior" | "Prior" | "Page_Up" => "PageUp",
         "KP_Next" | "Next" | "Page_Down" => "PageDn",
+        "Period" => "Period",
+        "Exclam" => "Exclam",
         "XF86MonBrightnessUp" => "Brightness+",
         "XF86MonBrightnessDown" => "Brightness-",
         "XF86KbdBrightnessUp" => "KbdLight+",
