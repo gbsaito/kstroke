@@ -1,0 +1,11 @@
+/home/saito/Projects/wshowkeys-rs/target/release/deps/xkbcommon-f5bf190958deb745.d: /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/lib.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/mod.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/compose.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/ffi.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/keysyms.rs
+
+/home/saito/Projects/wshowkeys-rs/target/release/deps/libxkbcommon-f5bf190958deb745.rlib: /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/lib.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/mod.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/compose.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/ffi.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/keysyms.rs
+
+/home/saito/Projects/wshowkeys-rs/target/release/deps/libxkbcommon-f5bf190958deb745.rmeta: /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/lib.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/mod.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/compose.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/ffi.rs /home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/keysyms.rs
+
+/home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/lib.rs:
+/home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/mod.rs:
+/home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/compose.rs:
+/home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/ffi.rs:
+/home/saito/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/xkbcommon-0.9.0/src/xkb/keysyms.rs:
