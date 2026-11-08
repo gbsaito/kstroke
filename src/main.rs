@@ -624,6 +624,17 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                 let kc = xkb::Keycode::new(code + 8);
                                 state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
                                 if !pressed {
+                                    if let Some(&r) = state.key_get_syms(kc).first() {
+                                        let rn = xkb::keysym_get_name(r);
+                                        let rm = match rn.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
+                                            "shift_l" | "shift_r" => Some("⇧"),
+                                            "control_l" | "control_r" => Some("Ctrl"),
+                                            "alt_l" | "alt_r" => Some("Alt"),
+                                            _ => None,
+                                        };
+                                        if let Some(rm) = rm { mods.retain(|x| x != &rm.to_string()); }
+                                        else { mods.clear(); }
+                                    }
                                     continue;
                                 }
                                 let Some(&sym) = state.key_get_syms(kc).first() else {
