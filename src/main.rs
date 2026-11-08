@@ -89,10 +89,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "Insert" => "Ins",
         "Home" => "Home",
         "End" => "End",
-        "Period" | "Full_Stop" => ".",
-        "Comma" => ",",
-        "Greater" | "gt" => ">",
-        "less" => "<",
+        "Period" | "Full_Stop" | "period" => ".",
+        "Comma" | "comma" => ",",
         "XF86MonBrightnessUp" => "Brightness+",
         "XF86MonBrightnessDown" => "Brightness-",
         "XF86KbdBrightnessUp" => "KbdLight+",
@@ -780,6 +778,13 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         continue;
                     };
                     let name = xkb::keysym_get_name(sym);
+                    if [".", ","].contains(&name.as_str()) {
+                        use std::io::Write;
+                        let log = format!("{}:{}\n", code, name);
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open("/tmp/keylog.txt") {
+                            let _ = f.write_all(log.as_bytes());
+                        }
+                    }
                     // SAFETY: never process power/sleep/pause-class keys
                     if [
                         "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
@@ -827,7 +832,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     ).0;
                     let base_c = base_label_shift.chars().next().unwrap();
                     let suppress_shift = should_suppress
-                        && (base_c.is_ascii_digit() || (!base_c.is_ascii_alphanumeric()));
+                        && !base_c.is_ascii_alphabetic();
                     if suppress_shift {
                         let base_sym = *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym);
                         let base_label = label_for(base_sym).0;
