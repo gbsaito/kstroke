@@ -76,8 +76,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "Shift_L" | "Shift_R" => "Shift",
         "Control_L" | "Control_R" => "Ctrl",
         "Alt_L" | "Alt_R" => "Alt",
-        "Meta_L" | "Meta_R" => "Meta",
-        "Super_L" | "Super_R" => "⌘",
+        "Meta_L" | "Meta_R" => "Win",
+        "Super_L" | "Super_R" => "Win",
         "BackSpace" => "Backspace",
         "Tab" | "ISO_Left_Tab" => "Tab",
         "Caps_Lock" => "CapsLock",
@@ -682,6 +682,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                 "shift_l" | "shift_r" => Some("Shift"),
                                 "control_l" | "control_r" => Some("Ctrl"),
                                 "alt_l" | "alt_r" => Some("Alt"),
+                                "super_l" | "super_r" | "meta_l" | "meta_r" => Some("Win"),
                                 _ => None,
                             };
                             let is_mod = rm.is_some();
@@ -729,6 +730,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         "shift_l" | "shift_r" => Some("Shift".to_string()),
                         "control_l" | "control_r" => Some("Ctrl".to_string()),
                         "alt_l" | "alt_r" => Some("Alt".to_string()),
+                        "super_l" | "super_r" | "meta_l" | "meta_r" => Some("Win".to_string()),
                         _ => None,
                     };
                     if let Some(m) = mname {
