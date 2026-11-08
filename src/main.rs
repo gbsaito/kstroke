@@ -619,7 +619,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
         for e in dir {
             if let Ok(e) = e {
                 if let Ok(name) = e.file_name().into_string() {
-                    if name.ends_with("-event-kbd") {
+                    if name.ends_with("-event-kbd") && !name.contains("-if01-") {
                         paths.push(e.path());
                     }
                 }
