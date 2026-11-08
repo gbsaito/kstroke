@@ -754,6 +754,10 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                     let _ = tx.send((stack, true, 0u32));
                                 }
                                 // standalone tap: box stays until expiry (0 post-refresh)
+                            } else if !mods.is_empty() {
+                                // still holding mod(s): show the stack again
+                                let stack = mods.join("+");
+                                let _ = tx.send((stack, true, 0u32));
                             } else if let Some((t, sp)) = &last_base {
                                 // base key released: display persists (no extra count)
                                 let _ = tx.send((t.clone(), *sp, 0u32));
