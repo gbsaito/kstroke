@@ -722,6 +722,8 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         eprintln!("DBG repeat code={}", code);
                         if let Some((t, sp)) = &last_base {
                             let _ = tx.send((t.clone(), *sp, 2u32));
+                        } else if !mods.is_empty() {
+                            let _ = tx.send((mods.join("+"), true, 2u32));
                         }
                         continue;
                     }
