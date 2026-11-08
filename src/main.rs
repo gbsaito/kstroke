@@ -637,22 +637,21 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
                                             "alt_l" | "alt_r" => Some("Alt"),
                                             _ => None,
                                         };
-                                        let changed = match rm {
+                                        let show = match rm {
                                             Some(m) => {
                                                 let n = mods.len();
                                                 mods.retain(|x| x != &m.to_string());
-                                                !mods.is_empty() || n != mods.len()
+                                                last_base.is_some() || n != mods.len()
                                             }
-                                            None => {
-                                                let had = !mods.is_empty();
-                                                mods.clear();
-                                                had
-                                            }
+                                            // base key released: keep held mods, just refresh display
+                                            None => last_base.is_some(),
                                         };
-                                        // combo over: re-render last key, or clear standalone-mod display
-                                        if changed {
+                                        // combo over: re-render last key, mod stack, or clear
+                                        if show {
                                             if let Some((t, sp)) = &last_base {
                                                 let _ = tx.send((t.clone(), *sp));
+                                            } else if !mods.is_empty() {
+                                                let _ = tx.send((mods.join("+"), true));
                                             } else {
                                                 let _ = tx.send(("\u{7}".to_string(), false));
                                             }
