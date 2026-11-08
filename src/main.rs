@@ -594,118 +594,140 @@ fn detect_xkb() -> (String, String, String) {
 fn input_loop(tx: std::sync::mpsc::Sender<(String, bool)>) {
     use evdev::{Device, EventSummary};
     let mut handles = Vec::new();
-    if let Ok(dir) = std::fs::read_dir("/dev/input") {
+    // one -event-kbd node per physical keyboard; event* enumeration double-counts
+    //hid devices exposing if01 clones
+    let mut paths: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(dir) = std::fs::read_dir("/dev/input/by-id") {
         for e in dir {
-            let path = e.ok().map(|e| e.path());
-            let Some(path) = path else { continue };
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if !name.starts_with("event") {
-                continue;
-            }
-            if let Ok(mut dev) = Device::open(&path) {
-                if dev.supported_keys().map(|k| k.iter().nth(0).is_some()).unwrap_or(false) {
-                    let tx = tx.clone();
-                    let p = path.clone();
-                    handles.push(std::thread::spawn(move || {
-                        let mut mods: Vec<String> = Vec::new();
-                        let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-                        let (rules, layout, variant) = detect_xkb();
-                        let km = xkb::Keymap::new_from_names(
-                            &ctx, &rules, &"pc105".to_string(), &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
-                            .expect("keymap");
-                        let mut state = xkb::State::new(&km);
-                        let mut last_base: Option<(String, bool)> = None;
-                        eprintln!("listening on {:?}", p);
-                        loop {
-                            for ev in match dev.fetch_events() {
-                                Ok(it) => it,
-                                Err(_) => break,
-                            } {
-                                let (code, val) = match ev.destructure() {
-                                    EventSummary::Key(_, k, v) => (u32::from(k.code()), v),
-                                    _ => continue,
-                                };
-                                let pressed = val == 1;
-                                let kc = xkb::Keycode::new(code + 8);
-                                state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
-                                if !pressed {
-                                    if let Some(&r) = state.key_get_syms(kc).first() {
-                                        let rn = xkb::keysym_get_name(r);
-                                        let rm = match rn.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                                            "shift_l" | "shift_r" => Some("⇧"),
-                                            "control_l" | "control_r" => Some("Ctrl"),
-                                            "alt_l" | "alt_r" => Some("Alt"),
-                                            _ => None,
-                                        };
-                                        let show = match rm {
-                                            Some(m) => {
-                                                let n = mods.len();
-                                                mods.retain(|x| x != &m.to_string());
-                                                last_base.is_some() || n != mods.len()
-                                            }
-                                            // base key released: keep held mods, just refresh display
-                                            None => last_base.is_some(),
-                                        };
-                                        // combo over: re-render last key, mod stack, or clear
-                                        if show {
-                                            if let Some((t, sp)) = &last_base {
-                                                let _ = tx.send((t.clone(), *sp));
-                                            } else if !mods.is_empty() {
-                                                let _ = tx.send((mods.join("+"), true));
-                                            } else {
-                                                let _ = tx.send(("\u{7}".to_string(), false));
-                                            }
-                                        }
-                                    }
-                                    continue;
-                                }
-                                let Some(&sym) = state.key_get_syms(kc).first() else {
-                                    continue;
-                                };
-                                let name = xkb::keysym_get_name(sym);
-                                // SAFETY: never process power/sleep/pause-class keys
-                                if [
-                                    "Pause", "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
-                                    "XF86Standby", "XF86Hibernate", "XF86_Suspend",
-                                ]
-                                .contains(&name.as_str())
-                                {
-                                    continue;
-                                }
-                                let (mut text, mut special) = label_for(sym);
-                                if text.is_empty() {
-                                    continue;
-                                }
-                                let mname = {
-                                    let nm = xkb::keysym_get_name(sym);
-                                    match nm.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
-                                        "shift_l" | "shift_r" => Some("⇧".to_string()),
-                                        "control_l" | "control_r" => Some("Ctrl".to_string()),
-                                        "alt_l" | "alt_r" => Some("Alt".to_string()),
-                                        _ => None,
-                                    }
-                                };
-                                if let Some(m) = mname {
-                                    if !mods.contains(&m) { mods.push(m); }
-                                    // standalone/holding display: show current mod stack
-                                    last_base = None;
-                                    let _ = tx.send((mods.join("+"), true));
-                                    continue;
-                                }
-                                last_base = Some((text.clone(), special));
-                                if !mods.is_empty() {
-                                    text = format!("{}+{}", mods.join("+"), text);
-                                }
-                                if tx.send((text, special)).is_err() {
-                                    return;
-                                }
-                            }
-                        }
-                    }));
+            if let Ok(e) = e {
+                if let Ok(name) = e.file_name().into_string() {
+                    if name.ends_with("-event-kbd") {
+                        paths.push(e.path());
+                    }
                 }
             }
         }
     }
+    if paths.is_empty() {
+        // fallback: any event node carrying keys (unchanged original behavior)
+        if let Ok(dir) = std::fs::read_dir("/dev/input") {
+            for e in dir {
+                let path = e.ok().map(|e| e.path());
+                let Some(path) = path else { continue };
+                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if !name.starts_with("event") {
+                    continue;
+                }
+                if let Ok(dev) = Device::open(&path) {
+                    if dev.supported_keys().map(|k| k.iter().nth(0).is_some()).unwrap_or(false) {
+                        paths.push(path);
+                    }
+                }
+            }
+        }
+    }
+    for p in paths {
+        let Ok(mut dev) = Device::open(&p) else { continue };
+        if !dev.supported_keys().map(|k| k.iter().nth(0).is_some()).unwrap_or(false) {
+            continue;
+        }
+        let tx = tx.clone();
+        let p = p.clone();
+        eprintln!("listening on {:?}", p);
+        handles.push(std::thread::spawn(move || {
+            let mut mods: Vec<String> = Vec::new();
+            let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+            let (rules, layout, variant) = detect_xkb();
+            let km = xkb::Keymap::new_from_names(
+                &ctx, &rules, &"pc105".to_string(), &layout, &variant, None, xkb::KEYMAP_COMPILE_NO_FLAGS)
+                .expect("keymap");
+            let mut state = xkb::State::new(&km);
+            let mut last_base: Option<(String, bool)> = None;
+            loop {
+                for ev in match dev.fetch_events() {
+                    Ok(it) => it,
+                    Err(_) => break,
+                } {
+                    let (code, val) = match ev.destructure() {
+                        EventSummary::Key(_, k, v) => (u32::from(k.code()), v),
+                        _ => continue,
+                    };
+                    let pressed = val == 1;
+                    let kc = xkb::Keycode::new(code + 8);
+                    state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
+                    if !pressed {
+                        if let Some(&r) = state.key_get_syms(kc).first() {
+                            let rn = xkb::keysym_get_name(r);
+                            let rm = match rn.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
+                                "shift_l" | "shift_r" => Some("\u{21e7}"),
+                                "control_l" | "control_r" => Some("Ctrl"),
+                                "alt_l" | "alt_r" => Some("Alt"),
+                                _ => None,
+                            };
+                            let show = match rm {
+                                Some(m) => {
+                                    let n = mods.len();
+                                    mods.retain(|x| x != &m.to_string());
+                                    last_base.is_some() || n != mods.len()
+                                }
+                                // base key released: keep held mods, just refresh display
+                                None => last_base.is_some(),
+                            };
+                            if show {
+                                if let Some((t, sp)) = &last_base {
+                                    let _ = tx.send((t.clone(), *sp));
+                                } else if !mods.is_empty() {
+                                    let _ = tx.send((mods.join("+"), true));
+                                } else {
+                                    let _ = tx.send(("\u{7}".to_string(), false));
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    let Some(&sym) = state.key_get_syms(kc).first() else {
+                        continue;
+                    };
+                    let name = xkb::keysym_get_name(sym);
+                    // SAFETY: never process power/sleep/pause-class keys
+                    if [
+                        "Pause", "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
+                        "XF86Standby", "XF86Hibernate", "XF86_Suspend",
+                    ]
+                    .contains(&name.as_str())
+                    {
+                        continue;
+                    }
+                    let (text, special) = label_for(sym);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let nm = xkb::keysym_get_name(sym);
+                    let mname = match nm.trim_start_matches("XKB_KEY_").to_lowercase().as_str() {
+                        "shift_l" | "shift_r" => Some("\u{21e7}".to_string()),
+                        "control_l" | "control_r" => Some("Ctrl".to_string()),
+                        "alt_l" | "alt_r" => Some("Alt".to_string()),
+                        _ => None,
+                    };
+                    if let Some(m) = mname {
+                        if !mods.contains(&m) { mods.push(m); }
+                        // standalone/holding display: show current mod stack
+                        last_base = None;
+                        let _ = tx.send((mods.join("+"), true));
+                        continue;
+                    }
+                    last_base = Some((text.clone(), special));
+                    if !mods.is_empty() {
+                        text = format!("{}+{}", mods.join("+"), text);
+                    }
+                    if tx.send((text, special)).is_err() {
+                        return;
+                    }
+                }
+            }
+        }));
+    }
+
     for h in handles {
         let _ = h.join();
     }
