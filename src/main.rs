@@ -140,10 +140,9 @@ impl App {
         // val: 0 = display refresh (released), 1 = press, 2 = key repeat (held)
         if val == 0 {
             if let Some(i) = self.keys.iter().position(|k| k.text == text) {
-                let mut k = self.keys.remove(i);
-                k.hold = false;
-                k.t = Instant::now();
-                self.keys.push(k);
+                // released: refresh in place, don't re-promote over newer keys
+                self.keys[i].hold = false;
+                self.keys[i].t = Instant::now();
                 self.dirty = true;
             }
             return;
