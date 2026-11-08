@@ -658,7 +658,8 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
         for e in dir {
             if let Ok(e) = e {
                 if let Ok(name) = e.file_name().into_string() {
-                    if name.ends_with("-event-kbd") || name.ends_with("-event-mouse")
+                    if (name.ends_with("-event-kbd") && !name.contains("-if01-"))
+                        || name.ends_with("-event-mouse")
                     {
                         paths.push(e.path());
                     }
@@ -808,6 +809,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     }
                     last_base = Some((text.clone(), special));
                     eprintln!("DBG down code={} text={}", code, text);
+                    eprintln!("DBGDEV {:?} down code={} val={}", p, code, val);
                     // shift prefixes like Ctrl: Shift+A, Shift+Space, etc.
                     let suppress_shift = false;
                     if suppress_shift {
