@@ -673,8 +673,8 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     let pressed = val == 1;
                     let repeating = val == 2;
                     let kc = xkb::Keycode::new(code + 8);
-                    state.update_key(kc, if pressed { xkb::KeyDirection::Down } else { xkb::KeyDirection::Up });
-                    if !pressed {
+                    state.update_key(kc, if val == 0 { xkb::KeyDirection::Up } else { xkb::KeyDirection::Down });
+                    if !pressed && val == 0 {
                         if let Some(&r) = state.key_get_syms(kc).first() {
                             let rn = xkb::keysym_get_name(r);
                             eprintln!("DBG up code={} last_base={:?}", code, last_base.is_some());
