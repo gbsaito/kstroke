@@ -7,6 +7,10 @@ edition = "2021"
 name = "wshowkeys-rs"
 path = "src/main.rs"
 
+[[bin]]
+name = "wsh-toggle"
+path = "src/bin/wsh-toggle.rs"
+
 [dependencies]
 wayland-client = "0.31"
 wayland-protocols = "0.32"
