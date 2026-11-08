@@ -635,7 +635,9 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
         for e in dir {
             if let Ok(e) = e {
                 if let Ok(name) = e.file_name().into_string() {
-                    if name.ends_with("-event-kbd") && !name.contains("-if01-") {
+                    if (name.ends_with("-event-kbd") && !name.contains("-if01-"))
+                        || name.ends_with("-event-mouse")
+                    {
                         paths.push(e.path());
                     }
                 }
@@ -686,6 +688,18 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         EventSummary::Key(_, k, v) => (u32::from(k.code()), v),
                         _ => continue,
                     };
+                    // mouse buttons (BTN_LEFT 272, BTN_RIGHT 273, BTN_MIDDLE 274)
+                    if (272..=274).contains(&code) && val != 2 {
+                        if val == 1 {
+                            let label = match code {
+                                272 => "MB-L",
+                                273 => "MB-R",
+                                _ => "MB",
+                            };
+                            let _ = tx.send((label.to_string(), true, 1u32));
+                        }
+                        continue;
+                    }
                     let pressed = val == 1;
                     let repeating = val == 2;
                     let kc = xkb::Keycode::new(code + 8);
