@@ -91,6 +91,8 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         "End" => "End",
         "Period" | "Full_Stop" => ".",
         "Comma" => ",",
+        "Greater" | "gt" => ">",
+        "less" => "<",
         "XF86MonBrightnessUp" => "Brightness+",
         "XF86MonBrightnessDown" => "Brightness-",
         "XF86KbdBrightnessUp" => "KbdLight+",
