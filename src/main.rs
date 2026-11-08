@@ -119,9 +119,11 @@ impl App {
         if text.is_empty() {
             return;
         }
-        if let Some(k) = self.keys.iter_mut().find(|k| k.text == text) {
+        if let Some(i) = self.keys.iter().position(|k| k.text == text) {
+            let mut k = self.keys.remove(i);
             k.count += 1;
             k.t = Instant::now();
+            self.keys.push(k); // most-recently-updated last: shown box follows focus
         } else {
             self.keys.push(Key {
                 text,
