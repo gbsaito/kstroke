@@ -615,6 +615,11 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
     // one -event-kbd node per physical keyboard; event* enumeration double-counts
     //hid devices exposing if01 clones
     let mut paths: Vec<std::path::PathBuf> = Vec::new();
+    // mac keyboard -> Cmd label, else Win
+    let win_label = if std::fs::read_dir("/dev/input/by-id")
+        .map(|d| d.filter_map(|e| e.ok()).any(|e| e.file_name().to_string_lossy().to_lowercase().contains("apple")))
+        .unwrap_or(false)
+    { "Cmd" } else { "Win" };
     if let Ok(dir) = std::fs::read_dir("/dev/input/by-id") {
         for e in dir {
             if let Ok(e) = e {
@@ -682,7 +687,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                                 "shift_l" | "shift_r" => Some("Shift"),
                                 "control_l" | "control_r" => Some("Ctrl"),
                                 "alt_l" | "alt_r" => Some("Alt"),
-                                "super_l" | "super_r" | "meta_l" | "meta_r" => Some("Win"),
+                                "super_l" | "super_r" | "meta_l" | "meta_r" => Some(&win_label.to_string()[..]),
                                 _ => None,
                             };
                             let is_mod = rm.is_some();
@@ -730,7 +735,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                         "shift_l" | "shift_r" => Some("Shift".to_string()),
                         "control_l" | "control_r" => Some("Ctrl".to_string()),
                         "alt_l" | "alt_r" => Some("Alt".to_string()),
-                        "super_l" | "super_r" | "meta_l" | "meta_r" => Some("Win".to_string()),
+                        "super_l" | "super_r" | "meta_l" | "meta_r" => Some(win_label.to_string()),
                         _ => None,
                     };
                     if let Some(m) = mname {
