@@ -218,7 +218,9 @@ impl App {
         }
 
         if self.buf_busy {
-            return; // previous frame not released yet; redraw on release/expiry
+            // previous frame not released yet: retry next loop tick
+            self.dirty = true;
+            return;
         }
         let buffer = self.buffer.as_ref().unwrap();
         let surf = self.surface.as_ref().unwrap();
