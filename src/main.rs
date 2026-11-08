@@ -692,9 +692,9 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     if (272..=274).contains(&code) && val != 2 {
                         if val == 1 {
                             let label = match code {
-                                272 => "MB-L",
-                                273 => "MB-R",
-                                _ => "MB",
+                                272 => "LMB",
+                                273 => "RMB",
+                                _ => "Middle",
                             };
                             let _ = tx.send((label.to_string(), true, 1u32));
                         }
