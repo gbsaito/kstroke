@@ -119,9 +119,14 @@ impl App {
         if text.is_empty() {
             return;
         }
+        let prev = self.keys.last().map(|l| (l.text.clone(), l.count));
         if let Some(i) = self.keys.iter().position(|k| k.text == text) {
             let mut k = self.keys.remove(i);
-            k.count += 1;
+            // repeat only counts consecutive presses of the same key
+            k.count = match prev {
+                Some((t, c)) if t == text => c + 1,
+                _ => 1,
+            };
             k.t = Instant::now();
             self.keys.push(k); // most-recently-updated last: shown box follows focus
         } else {
