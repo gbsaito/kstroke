@@ -225,7 +225,7 @@ impl App {
         }
 
         if self.buf_busy {
-            return; // previous buffer not released yet
+            return; // previous frame not released yet; redraw on release/expiry
         }
         let buffer = self.buffer.as_ref().unwrap();
         let surf = self.surface.as_ref().unwrap();
@@ -362,7 +362,7 @@ fn main() {
             events: libc::POLLIN,
             revents: 0,
         }];
-        let n = unsafe { libc::poll(fds.as_mut_ptr(), 1, 100) };
+        let n = unsafe { libc::poll(fds.as_mut_ptr(), 1, 20) };
         if n > 0 && (fds[0].revents & libc::POLLIN) != 0 {
             let did = conn.prepare_read().map(|g| g.read().is_ok()).unwrap_or(false);
             if did {
@@ -379,10 +379,7 @@ fn main() {
         }
         if app.dirty {
             app.dirty = false;
-            app.draw(&qh);
-            if app.buf_busy {
-                app.dirty = true; // retry after release
-            }        }
+            app.draw(&qh);        }
         conn.flush().unwrap();
     }
 }
