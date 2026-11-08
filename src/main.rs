@@ -731,7 +731,7 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     let name = xkb::keysym_get_name(sym);
                     // SAFETY: never process power/sleep/pause-class keys
                     if [
-                        "Pause", "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
+                        "XF86PowerOff", "XF86Sleep", "XF86PowerKey",
                         "XF86Standby", "XF86Hibernate", "XF86_Suspend",
                     ]
                     .contains(&name.as_str())
