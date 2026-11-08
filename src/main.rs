@@ -178,9 +178,7 @@ impl App {
         ctx.paint().unwrap();
         ctx.set_operator(cairo::Operator::Over);
 
-        // background
-        ctx.set_source_rgba(BG.0, BG.1, BG.2, BG.3);
-        ctx.paint().unwrap();
+        // no background fill: only key boxes are drawn
 
         // font
         ctx.select_font_face(FONT_FAMILY, FontSlant::Normal, FontWeight::Bold);
