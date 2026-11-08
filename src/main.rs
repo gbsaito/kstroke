@@ -23,7 +23,6 @@ const KEY_GAP: f64 = 12.0;
 const EXPIRY: Duration = Duration::new(2, 500000000);
 const FONT_FAMILY: &str = "JetBrains Mono";
 const FONT_SIZE: f64 = 34.0;
-const BG: (f64, f64, f64, f64) = (0.08, 0.08, 0.08, 0.55);
 const FG: (f64, f64, f64, f64) = (1.0, 1.0, 1.0, 1.0);
 const SPECIAL_FG: (f64, f64, f64, f64) = (0.85, 0.45, 0.35, 1.0);
 
@@ -113,6 +112,19 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
         return (name, true);
     }
     (format!("[{:x}]", u32::from(sym)), true)
+}
+
+// wshowkeys-style box color: pure black, translucent
+const BG: (f64, f64, f64, f64) = (0.0, 0.0, 0.0, 0.75);
+
+fn rounded_rect(ctx: &cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
+    const PI: f64 = std::f64::consts::PI;
+    ctx.new_sub_path();
+    ctx.arc(x + w - r, y + r, r, -PI / 2.0, 0.0);
+    ctx.arc(x + w - r, y + h - r, r, 0.0, PI / 2.0);
+    ctx.arc(x + r, y + h - r, r, PI / 2.0, PI);
+    ctx.arc(x + r, y + r, r, PI, PI * 1.5);
+    ctx.close_path();
 }
 
 impl App {
@@ -229,13 +241,8 @@ impl App {
             let bw = ext.width() + KEY_PAD * 2.0;
             let x = (w as f64) - KEY_PAD - bw;
             let y = h as f64 / 2.0;
-            ctx.set_source_rgba(BG.0 + 0.06, BG.1 + 0.06, BG.2 + 0.06, BG.3);
-            ctx.rectangle(
-                x,
-                y - (ext.height() / 2.0 + KEY_PAD),
-                bw,
-                ext.height() + KEY_PAD * 2.0,
-            );
+            ctx.set_source_rgba(0.0, 0.0, 0.0, 0.75);
+            rounded_rect(&ctx, x, y - (ext.height() / 2.0 + KEY_PAD), bw, ext.height() + KEY_PAD * 2.0, 6.0);
             ctx.fill().unwrap();
             let col = if key.special { SPECIAL_FG } else { FG };
             ctx.set_source_rgba(col.0, col.1, col.2, col.3);
