@@ -1,12 +1,18 @@
 # PLAN — wshowkeys-rs
 
-Objective: Rust rewrite (properly working) wshowkeys: Wayland live-keys overlay.
-- Runtime unprivileged: libinput udev seat (input group) × evdev reading threads; wayland-client core protocol + wlr layer-shell (zwlr_layer_shell_v1).
-- Rendering: cairo-rs toy-text SVG ✓.
-- Buffer: img buf pin shm memfd, ARGB32, cairo context clearing with Operator::Clear before paint.
-- Input: per-thread evdev loop with xkbcommon state per-thread (RMLVO: rules="evdev"!, model=pc105, layout=us, variant="") .
-- Safety: keysym block list for Pause / XF86PowerOff / XF86Sleep / PowerOff etc — never render or test via those keys.
-- Defaults: anchored layer surface bottom + right; margins (bottom 40, right 40) = padding; exclusive zone -1.
-- Font choice: FONT_FAMILY lateinit (JetBrains Mono). Fixed PANE_W 700, PANE_H 110.
-- Repeat counter ×N, expiry from last press 2.5s.
-- Debug: env WSK_DUMP for draw logs (ink / solid pixel counts, last key label) used for troubleshooting.
+- Goal: local unprivileged Wayland key overlay (Rust rewrite of wshowkeys).
+- Anchor bottom/right, padding 40, single key box, 2.5s expiry, ×N repeats.
+- BR auto-detect, env override, Insert -> wsh-toggle (single-shot).
+- Mods: Ctrl/Shift/Alt/Win/AltGr standalone + stack; Shift+key bare glyph when glyph changes; Shift+Space prefix kept.
+- Mouse: LMB / Middle / RMB clicks display.
+- Background: translucent black (alpha 0.75), rounded, per key box.
+
+## Completed
+- Overlay logic, drawing, commit, expiry, repeats, mods, safety blocklist.
+- Buffer busy retry, single-kbd-node selection, draw-follows-last-key, consecutive-only repeats, refresh protocol val 0/1/2.
+- (Hold) for key autorepeats and held mods; mod release clears hold; standalone mods persist till expiry.
+
+## Next
+- User live-test final behavior (punctuation, modifiers, repeats, holds, mouse, fn).
+- Export /home/saito/.local/bin/wshowkeys -> target/release/wshowkeys-rs binary.
+- Ask user on final branding/padding.

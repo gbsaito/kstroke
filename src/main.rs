@@ -816,12 +816,28 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     last_base = Some((text.clone(), special));
                     eprintln!("DBG down code={} text={}", code, text);
                     eprintln!("DBGDEV {:?} down code={} val={}", p, code, val);
-                    // shift alone produces the glyph itself: show "!" not "Shift+!"
-                    // (prefix kept when glyph matches base char: Shift+Space etc.)
-                    let suppress_shift = mods.len() == 1 && mods.contains(&"Shift".to_string())
+                    // shift handling: bare special char for shift+digit/punct (Shift+1 -> !, Shift+. -> .),
+                    // prefix like Ctrl for shift+letter (Shift+A)
+                    let should_suppress = mods.len() == 1 && mods.contains(&"Shift".to_string())
                         && text != label_for(
                             *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym),
                         ).0;
+                    let base_label_shift = label_for(
+                        *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym),
+                    ).0;
+                    let base_c = base_label_shift.chars().next().unwrap();
+                    let suppress_shift = should_suppress
+                        && (base_c.is_ascii_digit() || (!base_c.is_ascii_alphanumeric()));
+                    if suppress_shift {
+                        let base_sym = *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym);
+                        let base_label = label_for(base_sym).0;
+                        let base_c = base_label.chars().next().unwrap();
+                        let shift_is_digit = base_c.is_ascii_digit();
+                        let shift_is_punct = !base_c.is_ascii_alphanumeric();
+                        if shift_is_punct {
+                            text = base_label;
+                        }
+                    }
                     if suppress_shift {
                         if tx.send((text, special, 1u32)).is_err() {
                             return;
