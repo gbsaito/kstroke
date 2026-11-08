@@ -1,15 +1,15 @@
 [package]
-name = "wshowkeys-rs"
+name = "kstroke"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "wshowkeys-rs"
+name = "kstroke"
 path = "src/main.rs"
 
 [[bin]]
-name = "wsh-toggle"
-path = "src/bin/wsh-toggle.rs"
+name = "kstroke-toggle"
+path = "src/bin/kstroke-toggle.rs"
 
 [dependencies]
 wayland-client = "0.31"

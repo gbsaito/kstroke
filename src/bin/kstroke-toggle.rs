@@ -1,14 +1,14 @@
-// wsh-toggle — single-shot Insert toggle for wshowkeys-rs.
+// kstroke-toggle — single-shot Insert toggle daemon for kstroke.
 // Mango maps Insert → this; process exits after toggling once.
 
 use std::process::Command;
 
 fn toggle() {
-    let running = Command::new("pgrep").arg("-x").arg("wshowkeys-rs").output().map(|o| o.status.success()).unwrap_or(false);
+    let running = Command::new("pgrep").arg("-x").arg("kstroke").output().map(|o| o.status.success()).unwrap_or(false);
     if running {
-        let _ = Command::new("pkill").arg("-9").arg("wshowkeys-rs").status();
+        let _ = Command::new("pkill").arg("-9").arg("kstroke").status();
     } else {
-        let prog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/release/wshowkeys-rs");
+        let prog = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/release/kstroke");
         let _ = Command::new(prog).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn();
     }
 }

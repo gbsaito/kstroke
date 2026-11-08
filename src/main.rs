@@ -1,4 +1,4 @@
-// wshowkeys-rs — Wayland key overlay, bottom-right by default, with padding.
+// kstroke — Wayland key overlay, bottom-right by default, with padding.
 // Renders with cairo toy text API (no pango). Raw wayland-client.
 
 use std::os::fd::AsRawFd;
@@ -133,8 +133,7 @@ fn label_for(sym: xkb::Keysym) -> (String, bool) {
     (format!("[{:x}]", u32::from(sym)), true)
 }
 
-// wshowkeys-style box color: pure black, translucent
-const BG: (f64, f64, f64, f64) = (0.0, 0.0, 0.0, 0.75);
+// wshowkeys-style box color: pure black, translucentconst BG: (f64, f64, f64, f64) = (0.0, 0.0, 0.0, 0.75);
 
 fn rounded_rect(ctx: &cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
     const PI: f64 = std::f64::consts::PI;
@@ -393,7 +392,7 @@ fn main() {
         &surface,
         None, // overlay on every output
         Layer::Overlay,
-        "wshowkeys-rs".to_string(),
+        "kstroke".to_string(),
         &qh,
         (),
     );
