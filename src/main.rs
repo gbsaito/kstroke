@@ -787,7 +787,12 @@ fn input_loop(tx: std::sync::mpsc::Sender<(String, bool, u32)>) {
                     last_base = Some((text.clone(), special));
                     eprintln!("DBG down code={} text={}", code, text);
                     // shift alone produces the glyph itself: show "!" not "Shift+!"
-                    if mods.len() == 1 && mods.contains(&"Shift".to_string()) {
+                    // but keep "Shift+Space"/"Shift+Enter" when the base char matches
+                    let suppress_shift = mods.len() == 1 && mods.contains(&"Shift".to_string())
+                        && text != label_for(
+                            *state.get_keymap().key_get_syms_by_level(kc, 0, 0).first().unwrap_or(&sym),
+                        ).0;
+                    if suppress_shift {
                         if tx.send((text, special, 1u32)).is_err() {
                             return;
                         }
